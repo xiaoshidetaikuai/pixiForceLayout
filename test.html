@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body style="overflow: hidden">
+<script src="js/d3.js"></script>
+<script src="js/pixi-legacy.js"></script>
+<script>
+    let app = new PIXI.Application({width:window.innerWidth, height: window.innerHeight, backgroundColor : 0x1099bb, roundPixels: true, preserveDrawingBuffer: true});
+    document.body.appendChild(app.view);
+    let nodes = d3.range(1000).map(function(i) {
+        return {
+            index: i,
+            text:'bunny'
+        };
+    });
+
+    let links = d3.range(nodes.length - 1).map(function(i) {
+        return {
+            source: Math.floor(Math.sqrt(i)),
+            target: i + 1,
+            text: 'lineDes'
+        };
+    });
+    let texture;
+    PIXI.Loader.shared.add('songti', 'assets/font1/font.fnt').add('bunny', 'assets/bunny.png')
+        .load((loader, resources) => {
+            texture = resources.bunny.texture;
+            onAssetsLoaded();
+        });
+    const Container = PIXI.Container;
+    const Sprite = PIXI.Sprite;
+    const BitMapText = PIXI.BitmapText;
+    const Graphics = PIXI.Graphics;
+    const stage = app.stage;
+
+    function onAssetsLoaded () {
+        let nodeContainer = new Container();
+        let lineContainer = new Container();
+        let lineDesContainer = new Container();
+        let lineGraphics = new Graphics();
+        lineContainer.addChild(lineGraphics);
+        stage.addChild(lineContainer);
+        stage.addChild(nodeContainer);
+        stage.addChild(lineDesContainer);
+        let fw,fh;
+        nodes.forEach(function (n) {
+            let node = new Container();
+            let icon =  new Sprite(texture);
+            icon.x = -icon.width / 2;
+            icon.y = -icon.height / 2;
+            let text = new BitMapText(n.text, {font: "12px songti", align: "center"});
+            text.y = icon.height / 2 + 5;
+            text.x = -icon.width / 2;
+            node.addChild(icon);
+            node.addChild(text);
+            fw = node.width;
+            fh = node.height;
+            nodeContainer.addChild(node);
+
+        });
+        links.forEach(function(l){
+            let container = new Container();
+            let text = new BitMapText(l.text, {font: "12px songti", align: "center"});
+            text.x = 0;
+            text.y = 0;
+            container.addChild(text);
+            // container.x = (l.source.x + l.target.x) / 2;
+            // container.y = (l.source.y + l.target.y) / 2;
+            lineDesContainer.addChild(container);
+        })
+        let simulation = d3.forceSimulation(nodes)
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("link", d3.forceLink(links).distance(100).strength(1))
+            .force("x", d3.forceX())
+            .force("y", d3.forceY());
+        d3.timer(function () {
+            const children = nodeContainer.children;
+            children.forEach(function (c, i) {
+                c.x = nodes[i].x;
+                c.y = nodes[i].y
+            })
+        });
+        d3.timer(function () {
+            lineGraphics.clear();
+            links.forEach(function (l) {
+                lineGraphics.lineStyle(1, 0xfb00ff);
+                lineGraphics.moveTo(l.source.x, l.source.y);
+                lineGraphics.lineTo(l.target.x, l.target.y);
+            })
+        });
+        d3.timer(function () {
+            const children = lineDesContainer.children;
+            children.forEach(function (c, i) {
+                let l = links[i];
+                c.x = (l.source.x + l.target.x) / 2;
+                c.y = (l.source.y + l.target.y) / 2;
+            })
+        });
+        // const canvas = d3.select('canvas');
+        let r = Math.sqrt(fw * fw + fh * fh);
+        d3.select(app.view)
+            .call(d3.drag()
+                .container(app.view)
+                .subject(dragsubject)
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+        function dragsubject() {
+            return simulation.find(d3.event.x, d3.event.y, r);
+        }
+
+        function dragstarted() {
+            if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+            d3.event.subject.fx = d3.event.subject.x;
+            d3.event.subject.fy = d3.event.subject.y;
+        }
+
+        function dragged() {
+            d3.event.subject.fx = d3.event.x;
+            d3.event.subject.fy = d3.event.y;
+        }
+
+        function dragended() {
+            if (!d3.event.active) simulation.alphaTarget(0);
+            d3.event.subject.fx = null;
+            d3.event.subject.fy = null;
+        }
+        d3.select("canvas").call(d3.zoom().scaleExtent([0, 4]).on("zoom", zoom))
+        function zoom() {
+            let t = d3.event.transform;
+            app.stage.setTransform(t.x, t.y, t.k, t.k)
+
+        }
+    }
+</script>
+</body>
+</html>
